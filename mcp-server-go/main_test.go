@@ -137,3 +137,37 @@ func TestMCPManualIsServedFromTheRepo(t *testing.T) {
 		t.Fatalf("manual not returned: %.200s", out)
 	}
 }
+
+func TestMCPTheReadAndWaitToolsAnswerOverTheProtocol(t *testing.T) {
+	s, mr := connect(t)
+	seedFleet(mr, 5, nil)
+	mr.HSet("device:car_003", "speed", "60", "battery_temp", "45.0")
+
+	out, isErr := call(t, s, "get_fleet_snapshot", map[string]any{"min_speed": 55, "min_temp": 40})
+	if isErr || !strings.Contains(out, `"device_id":"car_003"`) || strings.Contains(out, "car_001") {
+		t.Fatalf("snapshot should list only car_003: %s", out)
+	}
+
+	out, isErr = call(t, s, "get_historical_logs", map[string]any{"device_id": "car_001"})
+	if isErr || strings.Count(out, "battery_temp") != 10 {
+		t.Fatalf("want the newest 10 readings, got: %s", out)
+	}
+	if out, _ = call(t, s, "get_historical_logs", map[string]any{"device_id": "car_099"}); !strings.Contains(out, "No historical") {
+		t.Fatalf("unknown car: %s", out)
+	}
+
+	out, isErr = call(t, s, "analyze_anomalies_stats", map[string]any{"device_id": "car_001"})
+	var stats struct {
+		Samples        int    `json:"samples"`
+		Classification string `json:"classification"`
+	}
+	if isErr || json.Unmarshal([]byte(out), &stats) != nil || stats.Samples != 20 || stats.Classification != "nominal" {
+		t.Fatalf("stats for a flat car: %s", out)
+	}
+
+	start := time.Now()
+	out, isErr = call(t, s, "wait_for_telemetry", map[string]any{"seconds": 1})
+	if isErr || !strings.HasPrefix(out, "Waited 1 seconds") || time.Since(start) < time.Second {
+		t.Fatalf("wait: %s after %v", out, time.Since(start))
+	}
+}

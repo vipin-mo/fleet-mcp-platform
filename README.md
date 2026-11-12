@@ -144,7 +144,9 @@ Claude Haiku 4.5, 20 seeded fleets, 2026-10-24 on v1.0.0 (files in `artifacts/ev
   blip or silent car.
 - Median 6 turns, 21.5k input tokens and 24 s per run.
 - Cost: the 20 runs used 375k input and 26k output tokens, $0.51 at Haiku 4.5 list price ($1 and $5 per
-  million), so about 2.5 cents a run. The 6 manual-only runs below cost $0.24, about 4 cents each.
+  million): 2.5 cents a run on average, 2.9 cents for the median run. The 6 control runs have nothing to fix
+  and cost under 1 cent each, which pulls the average down. The 6 manual-only runs below cost $0.24, about
+  4 cents each.
 - The first run of the same 20 seeds (2026-10-06, `artifacts/eval_20261006/`) came before a fix to the
   lone-spike rule (docs/DETECTION_LATENCY.md). It also passed 20 of 20, at 20.9k tokens and 26 s.
 - Limits: one model, one run per seed. The simulator, detector and scorer were written by the same person.
@@ -167,7 +169,7 @@ Both agents ran the same seeded cases with the same tools, write checks and scor
 | Manual-only, 6 fleets | Rules | 0 / 6 | 20 / 30 | 0 | 8 |
 
 - On the standard and hard suites the model adds no accuracy. It adds 16 to 22 seconds and 20k to 25k input
-  tokens (about 2.5 cents) per run. 8 s of the rule agent's time is the fixed wait after a fix.
+  tokens (2.5 cents on average) per run. 8 s of the rule agent's time is the fixed wait after a fix.
 - The detection and the stale-data checks live in the Go server, so rules can act on what `scan_fleet` returns.
   That is a design choice, and it is why both agents pass.
 - 12 of 12 still allows a true pass rate near 76%, so those runs cannot rank the two agents.
