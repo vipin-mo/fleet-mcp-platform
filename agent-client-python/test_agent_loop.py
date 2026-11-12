@@ -33,6 +33,7 @@ class World:
     def __init__(self):
         self.script = []                # list of replies, or callables (messages) -> reply
         self.feed_status = "ok"
+        self.scan_text = None           # raw scan_fleet reply; None = a normal reply built from feed_status
         self.server_calls = []          # (tool, args) that reached the server
         self.sent_messages = []         # the last messages list given to the model
         self.fail_on_initialize = None  # exception to raise when the MCP session starts
@@ -79,7 +80,7 @@ def agent(monkeypatch, tmp_path):
         async def call_tool(self, name, arguments=None):
             world.server_calls.append((name, arguments))
             if name == "scan_fleet":
-                text = json.dumps({"feed_status": world.feed_status, "flagged": []})
+                text = world.scan_text or json.dumps({"feed_status": world.feed_status, "flagged": []})
             else:
                 text = "Success: Over-The-Air command deployed to car_012. Register 'power_parameter' updated to 'eco_mode'."
             return Blk(content=[Blk(text=text)], is_error=False)
@@ -161,6 +162,32 @@ def test_a_later_healthy_scan_unblocks_writes(agent, tmp_path):
     agent.script = [first, second, reply([tool_use("3", "send_ota_command", FIX)], "tool_use"), finish()]
     assert agent.main.main() == 0
     assert ("send_ota_command", FIX) in agent.server_calls
+
+
+def test_write_before_any_scan_is_blocked_and_the_model_is_told_to_scan(agent, tmp_path):
+    agent.script = [reply([tool_use("1", "send_ota_command", FIX)], "tool_use"), finish()]
+    assert agent.main.main() == 0
+    assert agent.server_calls == []
+    result = agent.sent_messages[-1]["content"][0]
+    assert result["is_error"] is True and "scan_fleet" in result["content"]
+
+
+def test_write_in_the_same_turn_as_the_first_scan_is_blocked(agent, tmp_path):
+    # tool calls of one turn run in parallel, so the write cannot rely on a scan that has not returned yet
+    agent.script = [reply([tool_use("1", "scan_fleet", {}), tool_use("2", "send_ota_command", FIX)], "tool_use"), finish()]
+    assert agent.main.main() == 0
+    assert [c[0] for c in agent.server_calls] == ["scan_fleet"]
+
+
+def test_an_unreadable_scan_after_a_healthy_one_blocks_writes_again(agent, tmp_path):
+    def second(messages):
+        agent.scan_text = "not json"
+        return reply([tool_use("2", "scan_fleet", {})], "tool_use")
+
+    agent.script = [reply([tool_use("1", "scan_fleet", {})], "tool_use"), second,
+                    reply([tool_use("3", "send_ota_command", FIX)], "tool_use"), finish()]
+    assert agent.main.main() == 0
+    assert [c[0] for c in agent.server_calls] == ["scan_fleet", "scan_fleet"]
 
 
 # ---- crashes are visible and exit codes are honest -----------------------------------------

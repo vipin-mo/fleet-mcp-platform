@@ -292,9 +292,11 @@ def aggregate(results):
     }
 
 
-def render_summary(results, title="Agent evaluation"):
+def render_summary(results, title="Agent evaluation", code_version=None):
     agg = aggregate(results)
     lines = [f"# {title}", ""]
+    if code_version:
+        lines += [f"Code: `{code_version}`", ""]
     if agg["runs"]:
         lines += [
             f"- Runs scored: {agg['runs']}  (invalid, not scored: {agg['invalid_runs']})",

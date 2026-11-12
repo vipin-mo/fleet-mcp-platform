@@ -97,6 +97,19 @@ def simulator_command(case, manifest_path):
     return cmd
 
 
+def code_version(run=subprocess.run):
+    """The commit the run used, so a result can be tied to the code that produced it.
+
+    "<sha> + uncommitted changes" when tracked files differ from that commit; "unknown" outside git."""
+    try:
+        sha = run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+        dirty = run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                    capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return f"{sha} + uncommitted changes" if dirty else sha
+
+
 def ledger_path():
     return ROOT / "logs" / f"fleet_agent_ledger_{datetime.now(timezone.utc):%Y-%m-%d}.jsonl"
 
@@ -195,11 +208,11 @@ def run_case(case, case_dir, lead, agent_timeout, sleep=time.sleep,
     return score_case(case, manifest, text, code)
 
 
-def write_results(out_dir, results, title):
+def write_results(out_dir, results, title, version=None):
     with open(out_dir / "results.jsonl", "w", encoding="utf-8") as f:
         for r in results:
             f.write(json.dumps(r) + "\n")
-    summary = render_summary(results, title)
+    summary = render_summary(results, title, version)
     (out_dir / "summary.md").write_text(summary, encoding="utf-8")
     return summary
 
@@ -270,7 +283,8 @@ def main(argv=None):
         if not cases:
             print(f"No case of kind {sorted(wanted)} in the first {args.runs} cases of the suite.")
             return 1
-    print(f"{len(cases)} cases, results in {out_dir}")
+    version = code_version()
+    print(f"{len(cases)} cases, results in {out_dir}, code {version}")
 
     results = []
     invalid_streak = 0
@@ -280,10 +294,11 @@ def main(argv=None):
         result = run_case(case, out_dir / f"case_{case['index']:02d}_{case['kind']}", args.lead, args.agent_timeout,
                           agent=functools.partial(run_agent, name=args.agent))
         result["agent"] = args.agent
+        result["code_version"] = version
         results.append(result)
         verdict = "INVALID: " + result["error"] if result.get("error") else ("PASS" if result["passed"] else "FAIL: " + "; ".join(result["reasons"]))
         print("   ->", verdict, flush=True)
-        write_results(out_dir, results, f"Agent evaluation: {args.agent}, {args.suite} suite (in progress)")
+        write_results(out_dir, results, f"Agent evaluation: {args.agent}, {args.suite} suite (in progress)", version)
         invalid_streak = invalid_streak + 1 if result.get("error") else 0
         if invalid_streak >= args.max_invalid_streak:
             print(f"\nStopping: {invalid_streak} invalid cases in a row. Fix the problem below, then rerun.")
@@ -291,7 +306,7 @@ def main(argv=None):
             break
 
     print()
-    print(write_results(out_dir, results, f"Agent evaluation: {args.agent}, {args.suite} suite"))
+    print(write_results(out_dir, results, f"Agent evaluation: {args.agent}, {args.suite} suite", version))
     return 0
 
 

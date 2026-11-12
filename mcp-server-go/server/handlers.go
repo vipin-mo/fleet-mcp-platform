@@ -21,6 +21,9 @@ const DeviceSetKey = "fleet:devices"
 // Longest pause the agent may ask for between a fix and its re-check.
 const maxWaitSeconds = 15.0
 
+// How often send_ota_command retries when the vehicle changes between its checks and its write.
+const maxWriteAttempts = 3
+
 // Structural schemas for arguments passed by the LLM Orchestrator
 type FleetSnapshotArgs struct {
 	MinSpeed float64
@@ -228,42 +231,57 @@ func HandleSendOTACommand(arguments map[string]interface{}) (*mcp.CallToolResult
 
 	redisKey := fmt.Sprintf("device:%s", args.DeviceID)
 
-	exists, _ := database.RedisClient.Exists(database.Ctx, redisKey).Result()
-	if exists == 0 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: fmt.Sprintf("Failure: Device %s not found in fleet registry map", args.DeviceID),
-				},
-			},
-		}, nil
-	}
+	// The existence check, the freshness check and the write run as one optimistic transaction: WATCH the
+	// vehicle, read it, then MULTI/EXEC the write. If the simulator rewrites the vehicle in between, EXEC
+	// fails and the checks run again on the new data, so a write is never based on a reading that changed.
+	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
+		var refusal *mcp.CallToolResult
+		err := database.RedisClient.Watch(database.Ctx, func(tx *redis.Tx) error {
+			exists, err := tx.Exists(database.Ctx, redisKey).Result()
+			if err != nil {
+				return err
+			}
+			if exists == 0 {
+				refusal = textResult(false, fmt.Sprintf("Failure: Device %s not found in fleet registry map", args.DeviceID))
+				return nil
+			}
+			updatedAt, err := tx.HGet(database.Ctx, redisKey, "updated_at").Result()
+			if err != nil && err != redis.Nil {
+				return err
+			}
+			// Never change settings on data we cannot trust.
+			if err := CheckFreshForWrite(ageSeconds(updatedAt)); err != nil {
+				refusal = textResult(true, fmt.Sprintf("Rejected: %v. Report STALE TELEMETRY instead of acting.", err))
+				return nil
+			}
+			_, err = tx.TxPipelined(database.Ctx, func(pipe redis.Pipeliner) error {
+				pipe.HSet(database.Ctx, redisKey, args.Parameter, args.Value)
+				return nil
+			})
+			return err
+		}, redisKey)
 
-	// Never change settings on data we cannot trust.
-	updatedAt, _ := database.RedisClient.HGet(database.Ctx, redisKey, "updated_at").Result()
-	if err := CheckFreshForWrite(ageSeconds(updatedAt)); err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: fmt.Sprintf("Rejected: %v. Report STALE TELEMETRY instead of acting.", err),
-				},
-			},
-		}, nil
+		if err == redis.TxFailedErr {
+			continue // the vehicle changed while we checked it: check again
+		}
+		if err != nil {
+			return nil, err
+		}
+		if refusal != nil {
+			return refusal, nil
+		}
+		return textResult(false, fmt.Sprintf("Success: Over-The-Air command deployed to %s. Register '%s' updated to '%s'.",
+			args.DeviceID, args.Parameter, args.Value)), nil
 	}
+	return textResult(true, fmt.Sprintf("Rejected: %s kept changing while the write was checked (%d attempts). Nothing was written; scan again.",
+		args.DeviceID, maxWriteAttempts)), nil
+}
 
-	// Dynamic register selection based on orchestrator parameter choices
-	if err := database.RedisClient.HSet(database.Ctx, redisKey, args.Parameter, args.Value).Err(); err != nil {
-		return nil, err
-	}
-
+func textResult(isError bool, text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: fmt.Sprintf("Success: Over-The-Air command deployed to %s. Register '%s' updated to '%s'.", args.DeviceID, args.Parameter, args.Value),
-			},
-		},
-	}, nil
+		IsError: isError,
+		Content: []mcp.Content{&mcp.TextContent{Text: text}},
+	}
 }
 
 // HandleGetHistoricalLogs reads string arrays out of targeted list elements
