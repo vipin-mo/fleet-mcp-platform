@@ -88,7 +88,8 @@ python scripts/eval_runs.py --score-ledger logs/fleet_agent_ledger_2026-10-06.js
 
 ## Reading the output
 
-`eval_results/<timestamp>/` holds `summary.md`, `results.jsonl`, and one folder per case with `simulator.log`,
+`eval_results/<timestamp>/` holds `summary.md` (it starts with the commit the run used, marked
+"+ uncommitted changes" if tracked files differed), `results.jsonl`, and one folder per case with `simulator.log`,
 `agent.log`, `ledger.jsonl` and `manifest.json`. A `FAIL` row names the reason; open that case's ledger to see
 why. An `INVALID` row means the agent never produced a result (no key, Redis down, crash); it is listed apart.
 The suite stops after 3 invalid cases in a row.

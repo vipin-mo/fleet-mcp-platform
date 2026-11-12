@@ -48,5 +48,6 @@ to 5 s, 0.60 °C/s median 1 s to 2 s; the 0.10, 0.15, 0.25 and 0.40 rows did not
 `TestNoisySensorBeforeASpikeIsStillASpike` and `TestDetectorOnSimulatedSeries`.
 
 The 20-fleet agent evaluation in `artifacts/eval_20261006/` ran before this fix. Blips were rarely in the
-detector's window at the moment of a scan, which is why the agent never acted on one. The agent evaluation has
-not been repeated on the new detector.
+detector's window at the moment of a scan, which is why the agent never acted on one. The evaluation was
+repeated on the fixed detector on 2026-10-24 with the same 20 seeds: 20 of 20 passed, 43 of 43 faults fixed
+(`artifacts/eval_rerun_llm_20261024/`).
