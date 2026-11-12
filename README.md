@@ -144,7 +144,7 @@ Claude Haiku 4.5, 20 seeded fleets, 2026-10-24 on v1.0.0 (files in `artifacts/ev
   blip or silent car.
 - Median 6 turns, 21.5k input tokens and 24 s per run.
 - Cost: the 20 runs used 375k input and 26k output tokens, $0.51 at Haiku 4.5 list price ($1 and $5 per
-  million), so about 2.5 cents a run. The 6 manual-only runs below cost $0.25, about 4 cents each.
+  million), so about 2.5 cents a run. The 6 manual-only runs below cost $0.24, about 4 cents each.
 - The first run of the same 20 seeds (2026-10-06, `artifacts/eval_20261006/`) came before a fix to the
   lone-spike rule (docs/DETECTION_LATENCY.md). It also passed 20 of 20, at 20.9k tokens and 26 s.
 - Limits: one model, one run per seed. The simulator, detector and scorer were written by the same person.
@@ -155,7 +155,7 @@ Claude Haiku 4.5, 20 seeded fleets, 2026-10-24 on v1.0.0 (files in `artifacts/ev
 
 Both agents ran the same seeded cases with the same tools, write checks and scorer
 (`artifacts/eval_rerun_llm_20261024/`, `artifacts/eval_baseline_20261009/`, `artifacts/eval_hard_baseline_20261009/`,
-`artifacts/eval_hard_llm_20261009/`, `artifacts/eval_manual_baseline_20261024/`, `artifacts/eval_manual_llm_20261024/`).
+`artifacts/eval_hard_llm_20261009/`, `artifacts/eval_manual_baseline_20261112/`, `artifacts/eval_manual_llm_20261112/`).
 
 | Suite | Agent | Runs passed | Faults fixed | Input tokens per run (median) | Seconds per run (median) |
 | --- | --- | --- | --- | --- | --- |
@@ -163,7 +163,7 @@ Both agents ran the same seeded cases with the same tools, write checks and scor
 | Standard, 20 fleets | Rules | 20 / 20 | 43 / 43 | 0 | 8 |
 | Hard, 12 fleets (dual fault, silent faulty car, slow ramp) | Claude Haiku 4.5 | 12 / 12 | 45 / 45 | 25.5k | 30 |
 | Hard, 12 fleets | Rules | 12 / 12 | 45 / 45 | 0 | 8 |
-| Manual-only, 6 fleets (coolant leak next to ordinary cabin and battery faults) | Claude Haiku 4.5 | 6 / 6 | 30 / 30 | 28.4k | 32 |
+| Manual-only, 6 fleets (coolant leak next to ordinary cabin and battery faults) | Claude Haiku 4.5 | 6 / 6 | 30 / 30 | 28.9k | 28 |
 | Manual-only, 6 fleets | Rules | 0 / 6 | 20 / 30 | 0 | 8 |
 
 - On the standard and hard suites the model adds no accuracy. It adds 16 to 22 seconds and 20k to 25k input
@@ -175,9 +175,9 @@ Both agents ran the same seeded cases with the same tools, write checks and scor
   `vehicle_fault_manual.md`. The system prompt still lists only the two original fixes, and a 50 km/h governor
   does not clear the leak. In every run Claude searched the manual and wrote 30 to each leaking car and 50 to
   each ordinary cabin fault. The rules fixed the faults they know and left every leaking car alone.
-- Those Claude runs (2026-10-24) used a manual entry that also named the scan issue, `cabin_coolant_leak`. The
-  entry no longer does, and Claude has not been re-run on it yet. The rules, re-run on the new entry
-  (commit `1b5739a`), again passed 0 of 6 with 20 of 30 faults fixed (`artifacts/eval_manual_baseline_20261112/`).
+- These manual-only numbers are from 2026-11-12 (commits `1b5739a` for the rules, `3a44bc0` for Claude), after
+  the manual entry stopped naming the scan issue `cabin_coolant_leak`. The first runs on 2026-10-24, with that
+  hint, gave the same verdicts: Claude 6 of 6, rules 0 of 6 (`artifacts/eval_manual_llm_20261024/`).
 - That gap is by construction: the rules have no entry for the new code, and adding one is a one-line change.
   What the suite shows is that the agent follows a manual it was not told about in the prompt. 6 of 6 still
   allows a true pass rate near 61%.

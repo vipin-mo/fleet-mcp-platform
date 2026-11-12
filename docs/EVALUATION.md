@@ -73,9 +73,10 @@ report, and behaviour on inputs the rules do not expect.
 Result on 2026-10-09: both agents passed every case in the standard suite (20 of 20) and the hard suite
 (12 of 12). Those cases do not separate them.
 
-Result on 2026-10-24, manual suite (`--runs 6 --seed-base 3000`): Claude passed 6 of 6 and the rules 0 of 6.
-The rules fixed every battery and ordinary cabin fault and left the coolant leaks alone (20 of 30 faults).
-Claude searched the manual in every run and wrote 30 to each leak. See the README for the table.
+Result on the manual suite (`--runs 6 --seed-base 3000`): Claude passed 6 of 6 and the rules 0 of 6, first on
+2026-10-24 and again on 2026-11-12 after the manual entry stopped naming the scan issue. The rules fixed every
+battery and ordinary cabin fault and left the coolant leaks alone (20 of 30 faults). Claude searched the manual
+in every run and wrote 30 to each leak. See the README for the table.
 
 ## Scoring runs you already made
 

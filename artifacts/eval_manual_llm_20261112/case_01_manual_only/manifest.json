@@ -1,0 +1,24 @@
+{
+  "fault_start_tick": 20,
+  "battery": [
+    "car_022",
+    "car_084"
+  ],
+  "cabin": [
+    "car_007",
+    "car_017"
+  ],
+  "dual": [],
+  "coolant": [
+    "car_060",
+    "car_076"
+  ],
+  "spikes": [],
+  "silent": [],
+  "silent_faulty": [],
+  "heat_per_tick": 0.6,
+  "seed": 3000,
+  "profile": "manual_only",
+  "cars": 100,
+  "freeze_after": null
+}
