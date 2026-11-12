@@ -226,3 +226,22 @@ def test_manual_suite_uses_the_manual_only_profile_and_leaves_the_other_suites_a
     assert not any(c["silent_cars"] or c["silent_faulty"] or c["heat_per_tick"] or c["freeze_after"] for c in manual)
     assert {c["kind"] for c in ev.build_suite(12, 2000, "hard")} == {"dual", "silent_fault", "slow_ramp"}
     assert ev.parse_args(["--suite", "manual"]).suite == "manual"
+
+
+def test_code_version_names_the_commit_and_flags_uncommitted_changes():
+    def fake(dirty):
+        def run(cmd, **kw):
+            out = "abc1234\n" if "rev-parse" in cmd else (" M scripts/eval_runs.py\n" if dirty else "")
+            return type("R", (), {"stdout": out})()
+        return run
+    assert ev.code_version(fake(False)) == "abc1234"
+    assert ev.code_version(fake(True)) == "abc1234 + uncommitted changes"
+
+    def broken(cmd, **kw):
+        raise OSError("git not installed")
+    assert ev.code_version(broken) == "unknown"
+
+
+def test_summary_and_results_record_the_code_version(tmp_path):
+    ev.write_results(tmp_path, [], "t", "abc1234")
+    assert "Code: `abc1234`" in (tmp_path / "summary.md").read_text()

@@ -68,11 +68,16 @@ def parse_feed_status(scan_result_text):
 def check_feed_allows_writes(feed_status) -> tuple[bool, str]:
     """Second stale-data layer, in the client. The Go server also refuses writes on old readings.
 
-    feed_status is the most recent scan_fleet result: None (no scan yet), "ok", "stale" or "empty".
-    Anything other than None or "ok" blocks writes. An unknown value blocks too (fail closed).
+    feed_status is the most recent scan_fleet result: None (no scan yet, or a reply that could not be
+    read), "ok", "stale" or "empty". Only "ok" allows writes. Everything else blocks them (fail closed).
     """
-    if feed_status is None or feed_status == "ok":
+    if feed_status == "ok":
         return True, "Feed check passed."
+    if feed_status is None:
+        return False, (
+            "Guardrail Violation: no fleet scan has confirmed that telemetry is fresh. "
+            "Call 'scan_fleet' first and act only if its feed_status is 'ok'."
+        )
     return False, (
         f"Guardrail Violation: the last fleet scan reported feed_status='{feed_status}'. "
         "Telemetry is stale or missing. Do not change any vehicle. Report STALE TELEMETRY."

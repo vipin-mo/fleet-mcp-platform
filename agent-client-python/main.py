@@ -166,6 +166,9 @@ async def run_agent():
 
                 # Process parallel execution loops when tool steps are chosen
                 tool_blocks = [b for b in response.content if getattr(b, 'type', None) == "tool_use"]
+                # Writes in this turn are judged on the feed status from BEFORE the turn: the tools run in
+                # parallel, so a scan in the same turn has not been seen yet.
+                feed_at_turn_start = feed["status"]
 
                 async def execute_single_tool(block):
                     tool_name = block.name
@@ -175,7 +178,7 @@ async def run_agent():
                     log_agent_transaction("TOOL_REQUESTED", {"tool": tool_name, "arguments": tool_args})
 
                     if tool_name == "send_ota_command":
-                        is_safe, error_msg = check_feed_allows_writes(feed["status"])
+                        is_safe, error_msg = check_feed_allows_writes(feed_at_turn_start)
                         if is_safe:
                             is_safe, error_msg = validate_ota_payload(tool_args)
                         if not is_safe:
@@ -202,8 +205,9 @@ async def run_agent():
                         is_error = True
                         result_text = f"Error executing tool payload: {str(e)}"
 
-                    if tool_name == "scan_fleet" and not is_error:
-                        feed["status"] = parse_feed_status(result_text)
+                    if tool_name == "scan_fleet":
+                        # A failed or unreadable scan resets the status to None, which blocks writes.
+                        feed["status"] = None if is_error else parse_feed_status(result_text)
 
                     log_agent_transaction("TOOL_RESPONSE", {"tool": tool_name, "result": result_text, "is_error": is_error})
                     block_result = {

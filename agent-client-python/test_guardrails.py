@@ -47,9 +47,15 @@ def test_parse_feed_status_returns_none_for_anything_else(text):
     assert parse_feed_status(text) is None
 
 
-def test_writes_allowed_before_any_scan_and_when_feed_ok():
-    assert check_feed_allows_writes(None)[0] is True
+def test_writes_allowed_only_when_feed_ok():
     assert check_feed_allows_writes("ok")[0] is True
+
+
+def test_writes_blocked_before_any_scan_or_after_an_unreadable_scan():
+    ok, message = check_feed_allows_writes(None)
+    assert ok is False
+    assert "scan_fleet" in message
+    assert check_feed_allows_writes(parse_feed_status("not json"))[0] is False
 
 
 @pytest.mark.parametrize("status", ["stale", "empty", "weird", ""])

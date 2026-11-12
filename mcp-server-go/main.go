@@ -70,8 +70,20 @@ func main() {
 	}
 
 	ctx := context.Background()
+	s := newServer()
 
-	// 2. Initialize the Base MCP Server framework structure
+	// 2. Launch standard I/O communication server loop execution block
+	log.Println("Starting Go MCP server via Stdio transport pipeline...")
+	if err := s.Run(ctx, &mcp.StdioTransport{}); err != nil {
+		log.Printf("Server execution context terminated unexpectedly: %v", err)
+		os.Exit(1)
+	}
+}
+
+// newServer builds the MCP server with every tool registered. main runs it over stdio; the tests run the
+// same server over an in-memory transport.
+func newServer() *mcp.Server {
+	// Initialize the Base MCP Server framework structure
 	s := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "mcp-server-go",
@@ -185,10 +197,5 @@ func main() {
 		return res, WaitOutput{}, err
 	})
 
-	// 10. Launch standard I/O communication server loop execution block
-	log.Println("Starting Go MCP server via Stdio transport pipeline...")
-	if err := s.Run(ctx, &mcp.StdioTransport{}); err != nil {
-		log.Printf("Server execution context terminated unexpectedly: %v", err)
-		os.Exit(1)
-	}
+	return s
 }
